@@ -1,0 +1,744 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname trees) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;(trees.rkt).
+;; GOALS:
+
+(require rackunit)
+(require "extras.rkt")
+(require 2htdp/image)
+(require 2htdp/universe)
+;(require "sets.rkt")
+;(check-location "06" "trees.rkt")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#|(provide
+ initial-world
+ run
+ world-after-mouse-event
+ world-after-key-event
+ world-to-trees
+ tree-to-root
+ tree-to-sons
+ node-to-center
+ node-to-selected?)|#
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CONSTANTS:                                                                 ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; mouse pointer
+(define INITIAL-MOUSE-POINTER-X 0)
+(define INITIAL-MOUSE-POINTER-Y 0)
+
+; dimensions of the canvas
+(define CANVAS-WIDTH 500)
+(define CANVAS-HEIGHT 400)
+(define EMPTY-CANVAS (empty-scene CANVAS-WIDTH CANVAS-HEIGHT))
+(define HALF-CANVAS-WIDTH (/ CANVAS-WIDTH 2))
+(define HALF-CANVAS-HEIGHT (/ CANVAS-HEIGHT 2))
+
+; images of the node
+(define NODE-IMAGE (circle 10 "outline" "green"))
+(define SELECTED-NODE-IMAGE (circle 10 "solid" "green"))
+
+;; dimensions of the node
+(define NODE-RADIUS 10)
+
+; color of the lines
+(define LINE-COLOR "blue")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; END OF CONSTANTS                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; DATA DEFINITIONS                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-struct world (nodes))
+
+;; Interpretation:
+;; A World is a (make-world ListOfNodes)
+;; nodes is a ListOfNodes which are the root nodes of the canvas
+
+;; Template:
+;; world-fn : World -> ??
+;; (define (world-fn w)
+;;   (... (world-nodes w)))
+
+(define-struct node (x-pos y-pos mx my selected? sons))
+
+;; Interpretation:
+;; A Node is a
+;; (make-node Integer Integer Integer Integer Boolean ListOfNodes)
+;; x-pos is the x coordinate of the center of the node
+;; y-pos is the y coordiante of the center of the node
+;; mx is the distance between the mouse x coordinate and
+;; the x coordinate of the center of the node 
+;; my is the distance between the mouse y coordinate and
+;; the y coordinate of the center of the node
+;; selected? returns true iff the node is selected by a mouse
+;; sons is a list of nodes which represents the sons of the node.
+
+;; Template:
+;; node-fn : Node -> ??
+;; (define (node-fn n)
+;;   (... (node-x-pos n)
+;;        (node-y-pos n)
+;;        (node-mx n)
+;;        (node-my n)
+;;        (node-selected? n)
+;;        (lon-fn (node-sons n))))
+
+;; ListOfNodes
+;; A ListOfNodes (LON) is either
+;; -- empty
+;; -- (cons Node LON)
+
+;; Template:
+;; lon-fn : LON -> ??
+;; (define (lon-fn lon)
+;;   (cond
+;;     [(empty? lon) ...]
+;;     [else (...
+;;             (node-fn (first lon))
+;;             (lon-fn (rest lon)))]))
+
+;; KeyEvent is defined in the 2htdp/universe module. A KeyEvent
+;; represents key board events. Every KeyEvent is a string, but
+;; not all strings are key events. The predicate for comparing
+;; two KeyEvent is key=? .
+
+;; MouseEvent is defined in the 2htdp/universe module. A MouseEvent
+;; represents mouse events. Every MouseEvent is a string, but
+;; not all strings are mouse events. The predicate for comparing
+;; two MouseEvent is mouse=? .
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; END OF DATA DEFINITIONS                                                    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; EXAMPLES FOR TEST                                                          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; examples KeyEvents for testing
+(define new-root-kev "t")
+(define new-son-kev "n")
+
+(define left-delete-kev "l")
+(define delete-node-kev "d")
+
+;; example MouseEvents for testing:
+(define button-down-event "button-down")
+(define drag-event "drag")
+(define button-up-event "button-up")
+(define other-event "enter")
+
+(define initial-world-state
+  (make-world empty))
+
+(define world-with-one-root
+  (make-world (list (make-node HALF-CANVAS-WIDTH
+                               NODE-RADIUS
+                               INITIAL-MOUSE-POINTER-X
+                               INITIAL-MOUSE-POINTER-Y
+                               false
+                               empty))))
+
+(define world-with-left-sons (make-world
+                                   (list (make-node 450 240 52 44 true
+                                                    (list (make-node 56 348 0 0 false empty)
+                                                          (make-node 30 40 0 0 false empty)))
+                                         (make-node 450 240 52 44 true
+                                                    (list (make-node 60 55 0 0 false empty)
+                                                          (make-node 67 58 0 0 false empty))))))
+(define world-with-deleted-sons (make-world
+                                 (list (make-node 450 240 52 44 true empty)
+                                       (make-node 450 240 52 44 true empty))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; initial-world                                                              ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; initial-world : Any -> WorldState
+;; GIVEN: any value (ignored)
+;; RETURNS: the initial world with EMPTY-CANVAS having no nodes.
+;; EXAMPLES: (initial-world 1) -> initial-world-state
+;; STRATEGY: combine simpler functions
+(define (initial-world value)
+  (make-world empty))
+;; TEST:
+(begin-for-test
+  (check-equal?
+   (initial-world 1)
+   initial-world-state
+   "The initial world state should be returned having
+    no nodes")
+  (check-equal?
+   (initial-world "anb")
+   initial-world-state
+   "The initial world state should be returned having
+    no nodes"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; run                                                                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; run : Any -> World
+;; GIVEN: any value 
+;; EFFECT: runs a copy of an initial world.
+;; RETURNS: the final state of the world. The given value is ignored.
+;; STRATEGY: combine simpler functions
+(define (run value)
+  (big-bang (initial-world value)
+            (on-key world-after-key-event)
+            (on-draw world-to-scene)
+            (on-mouse world-after-mouse-event)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; world-after-key-event                                                      ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; help functions for key event
+
+;; is-new-root-key-event? : KeyEvent -> Boolean
+;; GIVEN : a KeyEvent
+;; RETURNS : true iff the KeyEvent represents
+;;           a new root KeyEvent
+;; STRATEGY: combine simpler functions
+(define (is-new-root-key-event? ke)
+  (key=? ke new-root-kev))
+
+;; is-left-canvas-delete-key-event? : KeyEvent -> Boolean
+;; GIVEN : a KeyEvent
+;; RETURNS : true iff the KeyEvent represents
+;;           a l key event that deletes every
+;;           node whose center is in the left
+;;           half of the canvas.
+;; STRATEGY: combine simpler functions
+(define (is-left-canvas-nodes-delete-key-event? ke)
+  (key=? ke left-delete-kev))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; world-after-key-event : World KeyEvent -> World
+;; GIVEN: a World and a key event
+;; RETURNS: the state of the world as it should be
+;;          following the given key event
+;; EXAMPLES:
+;; (world-after-key-event w "t") -> creates a new root node in the center of
+;;                                  the top of the canvas.
+;; (world-after-key-event w "l") -> deletes every node whose center is in the
+;;                                  left half of the canvas.(If a node is
+;;                                  deleted, all of its children are also
+;;                                  deleted, as with "d")
+;; (world-after-key-event w "n") -> to add a new son to selected nodes
+;; (world-after-key-event w "d") -> deletes the selected node and its whole
+;;                                  subtree.
+;; (world-after-key-event w "x") -> -- ignore all others
+;; STRATEGY: Divided into cases on KeyEvent kev
+
+(define (world-after-key-event w kev)
+  (cond 
+    [(is-new-root-key-event? kev)
+     (world-with-new-root w)]
+    [(is-left-canvas-nodes-delete-key-event? kev)
+     (world-with-left-canvas-nodes-deleted w)]
+;; deal with kev "n" "d" and else 
+ [else (alter-nodes-kev w kev)]))
+
+;; world-with-new-root : World -> World
+;; GIVEN: a world
+;; RETURNS: a new world with a new root added in the
+;;          center of the top of the canvas which
+;;          initially has no sons.
+;; EXAMPLES :
+;; (world-with-new-root initial-world) -> world-with-one-root
+;; STRATEGY: Use Template for World on w
+(define (world-with-new-root w)
+  (make-world
+   (cons (make-node HALF-CANVAS-WIDTH
+                    NODE-RADIUS
+                    INITIAL-MOUSE-POINTER-X
+                    INITIAL-MOUSE-POINTER-Y
+                    false
+                    empty)
+         (world-nodes w))))
+;; TEST:
+(begin-for-test
+  (check-equal?
+   (world-with-new-root initial-world-state)
+   world-with-one-root
+   "The initial empty world should now have one root")
+  (check-equal?
+   (world-after-key-event initial-world-state new-root-kev)
+   world-with-one-root))
+
+;; world-with-left-canvas-nodes-deleted : World -> World
+;; GIVEN: a world
+;; RETURNS: a world like the given one, that now does 
+;;          not have every node whose center was in 
+;;          the left half of the canvas.
+;; EXAMPLES:
+;; STRATEGY:
+(define (world-with-left-canvas-nodes-deleted w)
+  (make-world (delete-left-canvas-nodes (world-nodes w))))
+
+;; delete-left-canvas-nodes : ListOfNodes -> ListOfNodes
+;; GIVEN:
+;; RETURNS:
+;; EXAMPLES:
+;; STRATEGY:
+(define (delete-left-canvas-nodes lon)
+  (cond
+    [(empty? lon) empty]
+    [else (if (is-node-at-the-left-of-canvas (first lon))
+              (delete-left-canvas-nodes (rest lon))
+              (cons (delete-sub-nodes (first lon)) (delete-left-canvas-nodes (rest lon))))]))
+
+#| (delete-sub-nodes (first lon))
+               (delete-left-canvas-nodes (rest lon)))]))
+             (node-fn (first lon))
+             (lon-fn (rest lon))]))|#
+
+;; is-node-at-the-left-of-canvas : Node -> Boolean
+(define (is-node-at-the-left-of-canvas node)
+  (< (node-x-pos node) HALF-CANVAS-WIDTH))
+;; TEST:
+(begin-for-test
+  (check-equal?
+   (is-node-at-the-left-of-canvas (make-node 450 240 52 44 true empty))
+   false))
+
+;; delete-sub-nodes : Node -> Node
+(define (delete-sub-nodes node)
+  (cond
+    [(empty? (node-sons node)) node]
+    [else (make-node (node-x-pos node)
+                     (node-y-pos node)
+                     (node-mx node)
+                     (node-my node)
+                     (node-selected? node)
+                     (delete-left-canvas-nodes (node-sons node)))]))
+
+;; TEST:
+(begin-for-test
+  (check-equal?
+   (world-with-left-canvas-nodes-deleted world-with-roots)
+   initial)
+  (check-equal?
+   (world-with-left-canvas-nodes-deleted world-with-roots-and-sons)
+   initial)
+  (check-equal?
+   (world-with-left-canvas-nodes-deleted world-with-left-sons)
+   world-with-deleted-sons)
+  (check-equal?
+   (world-with-left-canvas-nodes-deleted (make-world (list (make-node 450 240 52 44 true empty))))
+   (make-world (list (make-node 450 240 52 44 true empty)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; alter-node-kev : WorldState KeyEvent -> WorldState
+;; RETURNS: the WorldState with nodes added or deleted.
+;; STRATEGY: Use Template for World on w
+(define (alter-nodes-kev w kev)
+  (make-world
+   (lon-after-kev (world-nodes w) kev)))
+
+;;==================================================================
+;; TESTS:
+;(begin-for-test
+;  (check-equal?
+;    )
+;;==================================================================
+
+;; lon-after-kev : LON KeyEvent -> LON
+;; GIVEN: a list of root-nodes and a key-event
+;; RETURNS: the state of a list of root-nodes after the given keyevent          
+;;          iff the given list of nodes is empty, return empty
+;; STRATEGY: Use HOF map on lon
+(define (lon-after-kev lon kev)
+  (map
+   (lambda (n) (node-after-kev n kev))
+   lon))
+
+;; node-after-kev : Node KeyEvent -> Node
+;; GIVEN: a list of root-nodes and a keyevent
+;; RETURNS: The state of the root-node that should follow the given keyevent.
+;;          The KeyEvent works only when a node is selected.
+;; STRATEGY: Divide into cases on (node-selected? n)
+(define (node-after-kev n kev)
+  (if (node-selected? n)
+      (selected-node-after-kev n kev)
+      (sons-after-kev n kev)))
+
+;; sons-after-kev : Node KeyEvent -> Node
+;; GIVEN: a node (can be either root-node or son-node) and a keyevent
+;; RETURNS: the state of the node that should follow the given keyevent.
+;;          iff the node doesn't have any sons, it will return the node unchanged.
+;;          else return the node with its node-sons property alter
+(define (sons-after-kev n kev)
+  (cond
+    [(empty? (node-sons n)) n]
+    [else (make-node (node-x-pos n)
+                     (node-y-pos n)
+                     (node-mx n)
+                     (node-my n)
+                     (node-selected? n)
+                     (cons (node-after-kev
+                            (first (node-sons n)) kev)
+                           (nodes-after-kev
+                            (rest (node-sons n)) kev)))]))
+
+(define (nodes-after-kev lon kev)
+  (cond
+    [(empty? lon) empty]
+    [else (cons (node-after-kev (first lon) kev)
+                (nodes-after-kev (rest lon) kev))]))
+
+;==================================================================
+; TESTS:
+(begin-for-test
+  (check-equal?
+   (world-after-key-event (make-world (list
+                           (make-node 100 100 0 0 false
+                                      (list
+                                       (make-node 200 200 0 0 true empty)))))
+                          "n")
+   (make-world
+    (list
+     (make-node 100 100 0 0 false
+                (list
+                 (make-node 200 200 0 0 true
+                            (list (make-node 200 230 0 0 false empty))))))))
+  (check-equal?
+   (world-after-key-event (make-world (list
+                           (make-node 100 100 0 0 true
+                                      (list
+                                       (make-node 200 200 0 0 false empty)))))
+                          "n")
+   (make-world
+    (list
+     (make-node 100 100 0 0 true
+                (list
+                 (make-node 230 130 0 0 false empty)
+                 (make-node 200 200 0 0 false empty)))))))
+;==================================================================
+
+;; selected-node-after-kev : Node KeyEvent -> Node
+;; GIVEN: a selected node and a KeyEvent
+;; RETURNS: "d" delete the selected node and its children
+;;          "n" add a son to the given node
+;;          And ignores all other KeyEvents
+;; STRATEGY: Divide into cases on KeyEvent kev
+(define (selected-node-after-kev n kev)
+  (cond
+    [(key=? kev new-son-kev) (add-son n)]
+    [(key=? kev delete-node-kev) (delete-node n)]
+    [else n]))
+
+;; add-son : Node -> Node
+;; RETURNS: a node with a new son added
+;; STRATEGY: Divided into Cases on (empty? (node-sons n))
+(define (add-son n)
+  (if (empty? (node-sons n))
+      (add-first-son n)      
+      (add-another-son n (max-x-pos (node-sons n)))))
+
+;; max-x-pos : Node -> Integer
+;; RETURNS: the x-coordinate of the rightmost son of a node
+;;          iff the node doesn't have any son then return 0
+;; STRATEGY: NEED TO CHANGE TO HOF
+(define (max-x-pos los)
+   (cond
+    [(empty? los) 0]
+    [else (max
+            (node-x-pos (first los))
+            (max-x-pos (rest los)))]))
+
+;; add-first-son : Node -> Node
+;; GIVEN: a node without any son
+;; RETURNS: a node with a new son added directly under the node
+;; STRATEGY: Use Template for Node on n
+(define (add-first-son n)
+  (make-node (node-x-pos n) (node-y-pos n)
+             (node-mx n) (node-my n) true
+             (cons
+              (make-node (node-x-pos n)
+                         (+ (node-y-pos n) (* 3 NODE-RADIUS))
+                         (son-mx (node-x-pos n)
+                                 (node-x-pos n)
+                                 (node-mx n))
+                         (son-mx (node-y-pos n)
+                                 (+ (node-y-pos n) (* 3 NODE-RADIUS))
+                                 (node-my n))
+                         false empty) ;///////////make the 0 to Constants
+              (node-sons n))))
+
+(define (son-mx n-x son-x mx)
+  (+ mx (- son-x n-x)))
+
+(define (son-my n-y son-y my)
+  (+ my (- son-y n-y)))
+
+;; add-another-son : Node Interger -> Node
+;; GIVEN: a node 
+;; RETURNS: a node with a new son added directly under the node
+;; STRATEGY: Use Template for Node on n
+(define (add-another-son n max-x-pos)
+  (make-node (node-x-pos n) (node-y-pos n)
+             (node-mx n) (node-my n) true
+             (cons
+              (make-node (+ max-x-pos (* 3 NODE-RADIUS))
+                         (+ (node-y-pos n) (* 3 NODE-RADIUS))
+                         (son-mx (node-x-pos n)
+                                 (+ max-x-pos (* 3 NODE-RADIUS))
+                                 (node-mx n))
+                         (son-mx (node-y-pos n)
+                                 (+ (node-y-pos n) (* 3 NODE-RADIUS))
+                                 (node-my n))
+                         false empty)
+              (node-sons n))))
+
+;; to be write
+(define (delete-node n)
+  n)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; world-to-scene : WorldState -> Scene
+;; GIVEN: a world state w
+;; RETURNS: a Scene that portrays the given world state.
+;; EXAMPLE: (world-to-scene initial-world-state) -> initial-scene
+;; STRATEGY: Use template for World on w
+(define (world-to-scene w)
+  (place-nodes
+   (world-nodes w)
+   EMPTY-CANVAS))
+;; example
+(define initial (make-world empty))
+(define world-with-roots (make-world (list (make-node 50 40 0 0 false empty)
+                                           (make-node 30 40 0 0 false empty))))
+(define world-with-roots-nodes (list (make-node 50 40 0 0 false empty)
+                                     (make-node 30 40 0 0 false empty)))
+(define world-with-roots-and-sons (make-world (list (make-node 50 40 52 44 true
+                                                               (list (make-node 56 48 0 0 false empty)
+                                                                     (make-node 30 40 0 0 false empty)))
+                                                    (make-node 55 47 57 49 true
+                                                               (list (make-node 60 55 0 0 false empty)
+                                                                     (make-node 67 58 0 0 false empty))))))
+(define world-with-roots-and-sons-nodes (list (make-node 50 40 52 44 true
+                                                         (list (make-node 56 48 0 0 false empty)
+                                                               (make-node 30 40 0 0 false empty)))
+                                              (make-node 55 47 57 49 true
+                                                         (list (make-node 60 55 0 0 false empty)
+                                                               (make-node 67 58 0 0 false empty)))))
+(define world-with-roots-and-sons-sons (make-world (list (make-node 50 40 52 44 true
+                                                                    (list (make-node 56 48 0 0 false
+                                                                                     (list (make-node 59 50 0 0 false empty)
+                                                                                           (make-node 67 52 0 0 false empty)))
+                                                                          (make-node 30 40 0 0 false empty)))
+                                                         (make-node 55 47 57 49 true
+                                                                    (list (make-node 60 55 0 0 false empty)
+                                                                          (make-node 67 58 0 0 false empty))))))
+(define world-with-roots-and-sons-sons-nodes (list (make-node 50 40 52 44 true
+                                                              (list (make-node 56 48 0 0 false
+                                                                               (list (make-node 59 50 0 0 false empty)
+                                                                                     (make-node 67 52 0 0 false empty)))
+                                                                    (make-node 30 40 0 0 false empty)))
+                                                   (make-node 55 47 57 49 true
+                                                              (list (make-node 60 55 0 0 false empty)
+                                                                    (make-node 67 58 0 0 false empty)))))
+;; TEST:
+(begin-for-test
+  (check-equal? (world-to-scene initial)
+                EMPTY-CANVAS)
+  (check-equal? (world-to-scene world-with-roots)
+                (place-nodes world-with-roots-nodes EMPTY-CANVAS))
+  (check-equal? (world-to-scene world-with-roots-and-sons)
+                (place-nodes world-with-roots-and-sons-nodes EMPTY-CANVAS))
+  (check-equal? (world-to-scene world-with-roots-and-sons-sons)
+                (place-nodes world-with-roots-and-sons-sons-nodes EMPTY-CANVAS)))
+
+
+;; place-nodes : ListofNodes Scene -> Scene
+;; GIVEN: a list of nodes and a scene
+;; RETURNS: a scene like the given one, but with
+;;          the given list of nodes painted
+;;          on it.
+;; STRATEGY: 
+(define (place-nodes lon canvas)
+  (cond
+    [(empty? lon) canvas]
+    [else
+     (place-node (first lon)
+                 (place-nodes (rest lon)
+                              canvas))]));;///////////// Lambda
+
+;; place-node : Node Scene -> Scene
+;; GIVEN: the state of a node and a scene
+;; RETURNS: a scene like the given one, but with
+;;          the given node painted on it.
+;; STRATEGY: Use template for Node on node
+(define (place-node node canvas)
+  (place-image (get-node-image node)
+               (node-x-pos node)
+               (node-y-pos node)
+               (place-sons (node-sons node) canvas)))
+
+;; place-sons : ListOfNodes Scene -> Scene
+(define (place-sons lon canvas)
+  (cond
+    [(empty? lon) canvas]
+    [else (place-nodes lon canvas)]))
+
+;; get-node-image : Node  -> Image
+;; GIVEN: the state of a node 
+;; RETURNS: an image of the rectangle
+;; WHERE: image is solid green if node is
+;;        selected otherwise it is outline
+;; STRATEGY: Use template for Rect on rect
+(define (get-node-image node)
+  (if (node-selected? node)
+      SELECTED-NODE-IMAGE
+      NODE-IMAGE))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; world-after-mouse-event : World Integer Integer MouseEvent -> World
+;; GIVEN: A World, the x- and y-coordinates of a mouse event,
+;;        and the mouse event
+;; RETURNS: the world that should follow the given world
+;;          after the given mouse event.
+;; STRATEGY: Use Template for WorldState on w
+(define (world-after-mouse-event w mx my mev)
+  (make-world
+    (lon-after-mouse-event (world-nodes w) mx my mev)))
+
+;; lor-after-mouse-event : LON mx my mev -> LON
+;; RETURNS: the state of a list of nodes after the mouse event
+;; STRATEGY: Use HOF map on lor
+(define (lon-after-mouse-event lon mx my mev)
+  (map
+   (lambda (n)
+     (root-after-mouse-event n mx my mev))
+   lon))
+
+(define (root-after-mouse-event n mx my mev)
+  (sons-after-mev
+   (node-after-mouse-event n mx my mev) mx my mev))
+
+(define (sons-after-mev n mx my mev)
+  (cond
+    [(empty? (node-sons n)) n]
+    [else (make-node (node-x-pos n)
+                     (node-y-pos n)
+                     (node-mx n)
+                     (node-my n)
+                     (node-selected? n)
+                     (cons (root-after-mouse-event
+                            (first (node-sons n)) mx my mev)
+                           (nodes-after-mev
+                            (rest (node-sons n)) mx my mev)))]))
+
+(define (nodes-after-mev lon mx my mev)
+  (cond
+    [(empty? lon) empty]
+    [else (cons (root-after-mouse-event (first lon) mx my mev)
+                (nodes-after-mev (rest lon) mx my mev))]))
+
+;; node-after-mouse-event : Node Int Int MouseEvent -> Node
+;; GIVEN: A node, the x- and y-coordinates of a mouse event,
+;;        and the mouse event
+;; RETURNS: the node that should follow the given node after
+;;          the given mouse event
+;; STRATEGY: Cases on mouse event mev
+(define (node-after-mouse-event n mx my mev)
+  (cond
+    [(mouse=? mev "button-down") (node-after-button-down n mx my)]
+    [(mouse=? mev "drag") (node-after-drag n mx my)]
+    [(mouse=? mev "button-up") (node-after-button-up n)]
+    [else n]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;v; node-after-button-down : Node NonNegInteger NonNegInteger -> Node
+;; RETURNS: the node following a button-down at the given location.
+;; STRATEGY: Use Template for Node on n
+(define (node-after-button-down n x y)
+  (if (in-node? n x y)
+      (make-node (node-x-pos n) (node-y-pos n)      
+                  (- (node-x-pos n) x) (- (node-y-pos n)  y)
+                  true (sons-after-button-down (node-sons n) x y))
+      n))
+
+(define (sons-after-button-down lon x y)
+  (cond
+    [(empty? lon) empty]
+    [else (cons (son-after-button-down (first lon) x y)
+                (sons-after-button-down (rest lon) x y))]))
+  
+(define (son-after-button-down n x y)
+   (make-node (node-x-pos n) (node-y-pos n)      
+             (- (node-x-pos n) x) (- (node-y-pos n)  y)
+             (node-selected? n) (sons-after-button-down(node-sons n)  x y)))
+ 
+
+;v; node-after-drag : Node NonNegInteger NonNegInteger -> Node
+;; RETURNS: the node following a drag at the given location
+;; STRATEGY: Use template for Node on n
+(define (node-after-drag n x y)
+  (if (node-selected? n)
+      (make-node
+       (+ x (node-mx n)) (+ y (node-my n))
+       (node-mx n) (node-my n)
+       (node-selected? n)
+       (nodes-after-drag (node-sons n) x y))  
+      n))
+
+(define (nodes-after-drag lon x y)
+  (cond
+    [(empty? lon) empty]
+    [else (cons (sons-after-drag (first lon) x y)
+          (nodes-after-drag (rest lon) x y))]))
+
+(define (sons-after-drag n x y)
+  (make-node
+       (+ x (node-mx n)) (+ y (node-my n))
+       (node-mx n) (node-my n)
+       (node-selected? n)
+       (nodes-after-drag (node-sons n) x y)))
+
+;v; node-after-button-up : Node -> Node
+;; RETURNS: the node following a button-up at the given location 
+;; STRATEGY: Use template for Node on n
+(define (node-after-button-up n)
+  (if (node-selected? n)
+      (make-node (node-x-pos n) (node-y-pos n)
+                 0 0 false (node-sons n))
+      n))
+
+;v; in-node? : Node NonNegInteger NonNegInteger -> Boolean
+;; RETURNS: true iff the given coordinate is inside the given node.
+;; STRATEGY: Use template for Node on n
+(define (in-node? n x y)
+  (and
+    (<= (abs (- x (node-x-pos n))) NODE-RADIUS)
+    (<= (abs (- y (node-y-pos n))) NODE-RADIUS)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;v; node-to-center : Node -> Posn
+;; RETURNS: the center of the given node as it is to be displayed on the scene.
+;; STRATEGY: Use Template for Node on n
+(define (node-to-center n)
+  (make-posn (node-x-pos n) (node-y-pos n)))
+
+;v; node-to-selected? : Node -> Boolean
+;; RETURNS: true iff the given node is selected.
+;; STRATEGY: Use Template for Node on n
+(define (node-to-selected? n) (node-selected? n))
+
+

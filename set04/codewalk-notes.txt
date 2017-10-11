@@ -1,0 +1,6 @@
+CCIS - soni28
+
+1) Missing main purpose statement 
+2) Rect interpretation not accurate
+3) Bad function name : rectangle-after-tick-helper
+4) Few functions do not accurately describe what is returned : rect-after-pen-down, place-dot

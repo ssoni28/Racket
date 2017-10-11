@@ -1,0 +1,87 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname outlines) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;; (outlines.rkt).
+;; GOALS:
+
+(require rackunit)
+(require "extras.rkt")
+;;(check-location "07" "outlines.rkt")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(provide
+ legal-flat-rep?
+ tree-rep-to-flat-rep)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CONSTANTS:                                                                 ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; DATA DEFINITIONS                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; TREE REPRESENTATION:
+
+;; An Outline is a ListOfSection
+
+(define-struct section (str secs))
+
+;; Interpretation:
+;; A Section is a (make-section String ListOfSection)
+;; where
+;; str is the header text of the section
+;; secs is the list of subsections of the section
+
+;; Template:
+;; section-fn : Section -> ??
+;; (define (section-fn s)
+;;   (... (section-str s)
+;;        (los-fn (section-secs s))))
+
+;; ListOfSection
+;; A ListOfNodes (LOS) is either
+;; -- empty
+;; -- (cons Section LOS)
+
+;; Template:
+;; los-fn : LOS -> ??
+;; (define (los-fn los)
+;;   (cond
+;;     [(empty? los) ...]
+;;     [else (...
+;;             (section-fn (first los))
+;;             (los-fn (rest los)))]))
+
+;; FLAT REPRESENTATION:
+
+;; An Outline is a ListOfLine
+
+(define-struct line (order-numbers title))
+
+;; Interpretation:
+;; A Line is a (make-line ListOfNumber String)
+;; where
+;; order-numbers is the list of numbers represent the order of sections
+;; title is is the header text of the section
+
+;; Template:
+;; line-fn : Line -> ??
+;; (define (line-fn l)
+;;   (... (lon-fn (line-order-numbers l))
+;;        (line-title l)))
+
+;; ListOfNumber
+;; A ListOfNumber (LON) is either
+;; -- empty
+;; -- (cons Number LON)
+
+;; Template:
+;; lon-fn : LON -> ??
+;; (define (lon-fn lon)
+;;   (cond
+;;     [(empty? lon) ...]
+;;     [else (...
+;;             (... (first lon))
+;;             (lon-fn (rest lon)))]))

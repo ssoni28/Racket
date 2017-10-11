@@ -1,0 +1,30 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname q4) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;; To insert "_" at the given ith position of a given string.
+;; q4.rkt
+
+(require rackunit)
+(require "extras.rkt")
+
+(provide string-insert)
+
+;; string-insert : String Number -> String
+;; PURPOSE :
+;; GIVEN : a string as inputString.
+;;         position i where "_" is to
+;;         be inserted in the given
+;;         inputString.
+;; RETURNS : a string with a "_" inserted
+;;           at the ith position of given
+;;           inputString.
+;;
+;; EXAMPLES :
+;; (string-insert "firstname" 5) -> "first_name"
+;; (string-insert "nike" 0) -> "_nike"
+;; (string-insert "" 0) -> "_"
+;; (sring
+;;
+;; DESIGN STRATEGY : Divide into cases on [condition]
+(define (string-insert inputString i)
+  (string-append (substring inputString 0 i) "_" (substring inputString i)))

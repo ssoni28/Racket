@@ -1,0 +1,25 @@
+TA Name:- Gabriel
+Helper Name:- Prashanth
+
+Design Grade:- B
+Presentation Grade:- B 
+Correctness Score:- 12/15
+
+Notes:-
+1. secs-to-lines doesn't document the invariant
+2. render-wilder-1 purposte statement is very poor, doesn't document invariant, funciton should be decomposed
+3. path function is really huge code
+
+problem 2:
+4. target-direction and move-towards-south-west target has same purpose statement.
+5. move-next-in-south-west and & similar functions could be generalized they do more than one tasks.
+6. purpose statement for threat? is missing
+7. deadlock functions missing returns statement and could have been generalized
+8. Many functions missing purpose statement and strategies.
+
+
+soni28:
+1. doesn't seem to have clarity about the code.
+2. couldn't explain about the lines-to-width context arguments, relation between them and how they 
+
+amber723:

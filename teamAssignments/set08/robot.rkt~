@@ -1,0 +1,666 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname robot) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;; robot.rkt
+
+;; Given an infinite chessborad.  The  chessboard extends  infinitely in  all
+;; directions.  The   positions   on  the  board  are  pairs   of   integers.
+;; On the chessboard, we have  a robot and  some blocks.  The  robot occupies
+;; a single square on the chessboard, as does each of  the blocks.  The robot
+;; can move any number of squares in any diagonal direction, but it can never
+;; move to or through a square occupied by a block. In this way, its behavior
+;; is like that of a bishop in chess.
+
+;; The goal is to implement  functions to determine the  possible plan of the
+;; the robot in order to reach a  given target position and  to determine the
+;; final possible position of the robot on executing a given plan.
+
+(require rackunit)
+(require "extras.rkt")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; PROVIDE STATEMENTS                                                         ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(provide
+ path
+ eval-plan)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CONSTANTS                                                                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; DATA DEFINITIONS                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A Position is a (list Integer Integer)
+;; where
+;; (list x y) represents the position (x,y) on the chessboard.
+;; x and y are integers.
+
+;; Template:
+;; position-fn : Position -> ??
+;; (define (position-fn pos)
+;;   (... (first pos))
+;;   (... (rest pos)))
+
+;; A MaybePosition is one of
+;; -- false
+;; -- Position
+
+;; Template
+;; maybepos-fn : MaybePos -> ??
+;; (define (maybepos-fn mp)
+;;   (cond
+;;     [(false? mp) ...]
+;;     [else (...mp)]))
+
+;; A ListOfPosition (LOP) is either
+;; -- Position
+;; -- (list Position LOP)
+
+;; Template:
+;; lop-fn : ListOfPosition -> ??
+;; (define (lop-fn lop)
+;;   (cond
+;;     [(empty? (rest lop)) ...(first lop)]
+;;     [else(...
+;;            (position-fn (first los))
+;;            (lop-fn (rest lop)))]))
+
+;; A Direction is one of
+;; -- "ne"
+;; -- "se"
+;; -- "sw"
+;; -- "nw"
+;; Interpretation:
+;; "ne" is north-east direction
+;; "se" is south-east direction
+;; "sw" is south-west direction
+;; "nw" is north-west direction
+
+;; Template:
+;; direction-fn : Direction -> ??
+;; (define (direction-fn dir)
+;;   (cond
+;;     [(string=? dir "ne") ...]
+;;     [(string=? dir "se") ...]
+;;     [(string=? dir "sw") ...]
+;;     [(string=? dir "nw") ...]))  
+
+;; A Move is a (list Direction PosInt)
+;; Interpretation:
+;; a move of the specified number of steps in the indicated direction. 
+
+;; Template:
+;; move-fn : Move -> ??
+;; (define (move-fn move)
+;;   (direction-fn (first move))
+;;   (position-fn (rest move)))
+
+;; A Plan is a ListOfMove
+;; WHERE: the list does not contain two consecutive moves in the same
+;; direction.
+;; INTERP: the moves are to be executed from the first in the list to
+;; the last in the list.
+
+;; A ListOfMove (LOM) is either
+;; -- empty
+;; -- (list Move LOM)
+
+;; Template:
+;; lom-fn : ListOfMove -> ??
+;; (define (lom-fn lom)
+;;   (cond
+;;     [(empty? lom) ...]
+;;     [else(...
+;;            (move-fn (first lom))
+;;            (lom-fn (rest lom)))]))
+
+;; A MaybePlan is one of
+;; -- false
+;; -- Plan
+
+;; Template
+;; maybeplan-fn : MaybePlan -> ??
+;; (define (maybeplan-fn mp)
+;;   (cond
+;;     [(false? mp) ...]
+;;     [else (...mp)]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; path                                                                       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; path : Position Position ListOfPosition -> MaybePlan
+;; GIVEN:
+;; 1. the starting position of the robot,
+;; 2. the target position that robot is supposed to reach
+;; 3. A list of the blocks on the board
+;; RETURNS: a plan that, when executed, will take the robot from
+;; the starting position to the target position without passing over any
+;; of the blocks, or false if no such sequence of moves exists.
+(define (path startpos targetpos lop)
+  (cond
+    [(and (= (first targetpos) (first startpos))
+          (= (first (rest targetpos)) (first (rest startpos))))
+     empty]
+    
+    [(or
+      (and (= (first targetpos) (first startpos))
+          (< (first (rest targetpos)) (first (rest startpos))))
+      (and (< (first targetpos) (first startpos))
+          (< (first (rest targetpos)) (first (rest startpos)))))
+     (target-direction "sw" startpos targetpos lop)]
+    
+    [(or
+      (and (= (first targetpos) (first startpos))
+          (> (first (rest targetpos)) (first (rest startpos))))
+      (and (> (first targetpos) (first startpos))
+          (> (first (rest targetpos)) (first (rest startpos)))))
+     (target-direction "ne" startpos targetpos lop)]
+    
+    [(or
+      (and (< (first targetpos) (first startpos))
+          (= (first (rest targetpos)) (first (rest startpos))))
+      (and (< (first targetpos) (first startpos))
+          (> (first (rest targetpos)) (first (rest startpos)))))
+     (target-direction "nw" startpos targetpos lop)]
+    
+    [(or
+      (and (> (first targetpos) (first startpos))
+          (= (first (rest targetpos)) (first (rest startpos))))
+      (and (> (first targetpos) (first startpos))
+          (< (first (rest targetpos)) (first (rest startpos)))))
+     (target-direction "se" startpos targetpos lop)]))
+
+;; target-direction : String Position Position ListOfPosition -> MaybePlan
+;; GIVEN: the direction of target from start position,
+;;        start position of robot,
+;;        target position of robot, and
+;;        list of blocks on chessboard.
+;; REUTNRS: the possible plan which when followed leads the robot to the given
+;; target position, otherwise false if the target position is not rechable.
+;; STRATEGY: Use template for Direction on dir
+(define (target-direction dir startpos targetpos lop)
+  (cond
+    [(string=? dir "sw") (move-towards-south-west-target dir startpos targetpos lop)]
+    [(string=? dir "ne") (move-towards-north-east-target dir startpos targetpos lop)]
+    [(string=? dir "nw") (move-towards-north-west-target dir startpos targetpos lop)]
+    [(string=? dir "se") (move-towards-south-east-target dir startpos targetpos lop)]))
+
+(define (move-towards-north-west-target  dir startpos targetpos lop)
+  false)
+(define (move-towards-south-east-target  dir startpos targetpos lop)
+  false)
+
+(define steps 0)
+;; move-towards-south-west-target :
+;;                         String Position Position ListOfPosition -> MAybePlan
+;; GIVEN: direction of target position from start position,
+;;        start position of robot,
+;;        target position of robot, and
+;;        list of blocks positions on the chessboard
+;; RETUNRS: the possible plan
+;; STRATEGY: cases on whether the target is reachable or not
+(define (move-towards-south-west-target dir startpos targetpos lop)
+  (cond
+    [(move-towards-target-possible? startpos targetpos)
+     (move-next-in-south-west dir startpos targetpos lop steps)]
+    [else false]))
+
+;; move-towards-target-possible? : Position Position -> Boolean
+;; GIVEN: start position of robot, and
+;;        target position of robot.
+;; RETURNS: true iff the target position is in reach of start position
+;; according to moving pattern of robot
+;; STRATEGY: Use template for Position on startpos and targetpos
+(define (move-towards-target-possible? startpos targetpos)
+  (= (modulo (-
+                 (+ (first startpos) (first (rest startpos)))
+                 (+ (first targetpos) (first (rest targetpos))))
+                2)
+        0))
+
+;; next-move-in-south-west : Position -> Position
+;; next-move-in-south-east : Position -> Position
+;; next-move-in-north-west : Position -> Position
+;; next-move-in-north-east : Position -> Position
+;; GIVEN: a postion
+;; RETURNS: the next position in south-west, south-east,
+;; north-west or north-east direction
+;; STRATEGY: Use template for Position on pos
+(define (next-move-in-south-west pos)
+  (list (- (first pos) 1) (- (first (rest pos)) 1)))
+(define (next-move-in-south-east pos)
+  (list (+ (first pos) 1) (- (first (rest pos)) 1)))
+(define (next-move-in-north-west pos)
+  (list (- (first pos) 1) (+ (first (rest pos)) 1)))
+(define (next-move-in-north-east pos)
+  (list (+ (first pos) 1) (+ (first (rest pos)) 1)))
+
+;; move-next-in-south-west : String Position Position ListOfPosition Integer ->
+;; GIVEN:
+;; RETURNS:
+;; STRATEGY:
+(define (move-next-in-south-west dir startpos targetpos lop steps)
+  (if (or (threat? (next-move-in-south-west startpos) lop)
+          (deadlock-in-south-west? (next-move-in-south-west startpos) lop))
+      (change-direction move-next-in-south-east dir "se" startpos targetpos lop steps)
+      (move-in-south-west dir (next-move-in-south-west startpos) targetpos lop (+ steps 1))))
+
+;; change-direction 
+(define (change-direction func dir newdir startpos targetpos lop steps)
+  (if (= steps 0)
+      (func newdir startpos targetpos lop steps)
+      (list (list dir steps) (func newdir startpos targetpos lop 0))))
+         
+;; move-in-south-west : String Position Position LisOfPosition Integer ->
+;; GIVEN:
+;; RETURNS:
+;; STRATEGY:
+(define (move-in-south-west dir nextpos targetpos lop steps)
+  (cond
+    [(target-found? nextpos targetpos) (list dir steps)]
+    [(target-link-found? nextpos targetpos)
+     (check-next-direction dir nextpos targetpos lop steps)]
+    [else (move-next-in-south-west dir nextpos targetpos lop steps)]))
+
+;; check-next-direction
+(define (check-next-direction dir nextpos targetpos lop steps)
+  (cond
+    [(and (< (first targetpos) (first nextpos))
+          (> (first (rest targetpos)) (first (rest nextpos))))
+     (change-direction move-next-in-north-west dir "nw" nextpos targetpos lop steps)]
+     [(and (> (first targetpos) (first nextpos))
+          (< (first (rest targetpos)) (first (rest nextpos))))
+      (change-direction move-next-in-south-east dir "se" nextpos targetpos lop steps)]))
+    
+#|
+  (if (or (target-found? nextpos targetpos)
+          (target-link-found? nextpos targetpos))
+      (list dir steps)
+      (move-next-in-south-west dir nextpos targetpos lop steps)))|#
+
+;; target-found? : Position Position -> Boolean
+;; GIVEN: a start position and a target position of robot
+;; RETURNS: true iff start position and target position are equal
+;; STRATEGY: Use template for position on nextpos and targetpos
+(define (target-found? nextpos targetpos)
+  (and
+       (= (first nextpos) (first targetpos))
+       (= (first (rest nextpos)) (first (rest targetpos)))))
+
+;; target-link-found? : Position Position -> Boolean
+;; GIVEN: a start position and a target position of robot
+;; RETURNS: true iff target position is reachable from start position
+;; STRATEGY: Use template for position on nextpos and targetpos
+(define (target-link-found? nextpos targetpos)
+  (=
+       (+ (first targetpos) (first (rest targetpos)))
+       (+ (first nextpos) (first (rest nextpos)))))
+
+;; target-link-found-in-different-direction? : Position Position -> Boolean
+;; GIVEN: a start position and a target position of robot
+;; RETURNS: true iff target position is reachable from start position
+;; STRATEGY: Use template for position on nextpos and targetpos
+(define (target-link-found-in-different-direction? nextpos targetpos)
+  (=
+       (- (first targetpos) (first (rest targetpos)))
+       (- (first nextpos) (first (rest nextpos)))))
+
+;; move-next-in-south-east
+(define (move-next-in-south-east dir startpos targetpos lop steps)
+  (if (or
+        (threat? (next-move-in-south-east startpos) lop)
+        (deadlock-in-south-east? (next-move-in-south-east startpos) lop))
+      (change-direction move-next-in-north-east dir "ne" startpos targetpos lop steps)
+      (move-in-south-east dir (next-move-in-south-east startpos) targetpos lop (+ steps 1))))
+
+;; move-in-south-east : String Position Position LisOfPosition Integer ->
+;; GIVEN:
+;; RETURNS:
+;; STRATEGY:
+(define (move-in-south-east dir nextpos targetpos lop steps)
+  (cond
+    [(target-found? nextpos targetpos) (list dir steps)]
+    [(target-link-found? nextpos targetpos)
+     (move-next-in-south-east dir nextpos targetpos lop steps)]
+    [(target-link-found-in-different-direction? nextpos targetpos)
+     (possible-next-direction dir nextpos targetpos lop steps)]
+    [else (if (or (threat? (next-move-in-south-west nextpos) lop)
+          (deadlock-in-south-west? (next-move-in-south-west nextpos) lop))
+      (move-next-in-south-east dir nextpos targetpos lop steps)
+      (change-direction move-next-in-south-west dir "sw" nextpos targetpos lop steps))]))
+
+;; possible-next-direction
+(define (possible-next-direction dir nextpos targetpos lop steps)
+  (cond
+    [(and (> (first targetpos) (first nextpos))
+          (> (first (rest targetpos)) (first (rest nextpos))))
+     (change-direction move-next-in-north-east dir "ne" nextpos targetpos lop steps)]
+     [(and (< (first targetpos) (first nextpos))
+          (< (first (rest targetpos)) (first (rest nextpos))))
+      (change-direction move-next-in-south-west dir "sw" nextpos targetpos lop steps)]))
+    
+;; move-next-in-north-east
+(define (move-next-in-north-east dir nextpos targetpos lop steps)
+  (if (or
+        (threat? (next-move-in-north-east nextpos) lop)
+        (deadlock-in-north-east? (next-move-in-north-east nextpos) lop)) ;; chek dir
+      (change-direction move-next-in-north-west dir "nw" nextpos targetpos lop steps)
+      (move-in-north-east dir (next-move-in-north-east nextpos) targetpos lop (+ steps 1))))
+
+;; move-in-north-east
+(define (move-in-north-east dir nextpos targetpos lop steps)
+  (cond
+    [(target-found? nextpos targetpos) (list dir steps)]
+    [(target-link-found? nextpos targetpos)
+     (check-next-direction dir nextpos targetpos lop steps)]
+    [(and
+      (> (first targetpos) (first (next-move-in-north-east nextpos)))
+      (> (first (rest targetpos)) (first (rest (next-move-in-north-east nextpos)))))
+     (move-next-in-north-east dir nextpos targetpos lop steps)]
+    [else (if (or
+               (threat? (next-move-in-south-east nextpos) lop)
+               (deadlock-in-south-east? (next-move-in-south-east nextpos) lop))
+          (move-next-in-north-east dir nextpos targetpos lop steps)
+          (change-direction move-next-in-south-east dir "se" nextpos targetpos lop steps))]))
+
+;; move-next-in-north-west
+(define (move-next-in-north-west dir startpos targetpos lop steps)
+  (cond
+    [(and
+      (or
+        (threat? (next-move-in-north-west startpos) lop)
+        (deadlock-in-north-west? (next-move-in-north-west startpos) lop))
+      (or
+        (threat? (next-move-in-south-west startpos) lop)
+        (deadlock-in-south-west? (next-move-in-south-west startpos) lop)))
+     false]
+  [else (if (or
+        (threat? (next-move-in-north-west startpos) lop)
+        (deadlock-in-north-west? (next-move-in-north-west startpos) lop))
+      (change-direction move-next-in-south-west dir "sw" startpos targetpos lop steps)
+      (move-in-north-west dir (next-move-in-north-west startpos) targetpos lop (+ steps 1)))]))
+
+;; move-in-north-west
+(define (move-in-north-west dir nextpos targetpos lop steps)
+  (cond
+    [(target-found? nextpos targetpos) (list dir steps)]
+    [(target-link-found? nextpos targetpos)
+     (move-next-in-north-west dir nextpos targetpos lop steps)]
+     [(target-link-found-in-different-direction? nextpos targetpos)
+     (possible-next-direction dir nextpos targetpos lop steps)]
+    [else (if (or (threat? (next-move-in-south-west nextpos) lop)
+          (deadlock-in-south-west? (next-move-in-south-west nextpos) lop))
+      (move-next-in-north-west dir nextpos targetpos lop steps)
+      (change-direction move-next-in-south-west dir "sw" nextpos targetpos lop steps))]))
+
+;; threat? : Position ListofPosition -> Boolean
+;; GIVEN:
+;; RETURNS:
+;; STRATEGY: Use HOF ormap on lop
+(define (threat? nextpos lop)
+  (ormap
+   ;; Position -> Boolean
+   ;; GIVEN:
+   ;; RETURNS:
+   (lambda (block) (and
+                    (= (first nextpos) (first block))
+                    (= (first (rest nextpos)) (first (rest block)))))
+   lop))
+
+;; deadlock-in-south-west? : Position ListofPosition -> Boolean
+;; deadlock-in-north-east? : Position ListofPosition -> Boolean
+;; deadlock-in-north-west? : Position ListofPosition -> Boolean
+;; deadlock-in-south-east? : Position ListofPosition -> Boolean
+;; GIVEN:
+;; RETURNS:
+;; STRATEGY: combine simpler functions
+(define (deadlock-in-south-west? nextpos lop)
+  (and
+   (threat? (next-move-in-north-west nextpos) lop)
+   (threat? (next-move-in-south-east nextpos) lop)
+   (threat? (next-move-in-south-west nextpos) lop)))
+
+(define (deadlock-in-north-east? nextpos lop)
+  (and
+   (threat? (next-move-in-north-west nextpos) lop)
+   (threat? (next-move-in-south-east nextpos) lop)
+   (threat? (next-move-in-north-east nextpos) lop)))
+
+(define (deadlock-in-north-west? nextpos lop)
+  (and
+   (threat? (next-move-in-north-west nextpos) lop)
+   (threat? (next-move-in-south-west nextpos) lop)
+   (threat? (next-move-in-north-east nextpos) lop)))
+
+(define (deadlock-in-south-east? nextpos lop)
+  (and
+   (threat? (next-move-in-south-west nextpos) lop)
+   (threat? (next-move-in-south-east nextpos) lop)
+   (threat? (next-move-in-north-east nextpos) lop)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; move-towards-north-east-target :
+;;                         String Position Position ListOfPosition -> MAybePlan
+;; GIVEN: direction of target position from start position,
+;;        start position of robot,
+;;        target position of robot, and
+;;        list of blocks positions on the chessboard
+;; RETUNRS: the possible plan
+;; STRATEGY: cases on whether the target is reachable or not
+(define (move-towards-north-east-target  dir startpos targetpos lop)
+  (cond
+    [(move-towards-target-possible? startpos targetpos)
+     (move-next-in-north-east-ne dir startpos targetpos lop steps)]
+    [else false]))
+
+;; move-next-in-north-east-ne : String Position Position ListOfPosition Integer ->
+;; GIVEN:
+;; RETURNS:
+;; STRATEGY:
+(define (move-next-in-north-east-ne dir startpos targetpos lop steps)
+  (if (or (threat? (next-move-in-north-east startpos) lop)
+          (deadlock-in-north-east? (next-move-in-north-east startpos) lop))
+      (change-direction move-next-in-south-east-ne dir "se" startpos targetpos lop steps)
+      (move-in-north-east-ne dir (next-move-in-north-east startpos) targetpos lop (+ steps 1))))
+
+;; move-in-north-east-ne : String Position Position LisOfPosition Integer ->
+;; GIVEN:
+;; RETURNS:
+;; STRATEGY:
+(define (move-in-north-east-ne dir nextpos targetpos lop steps)
+  (cond
+    [(target-found? nextpos targetpos) (list dir steps)]
+    [(target-link-found? nextpos targetpos)
+     (check-next-direction dir nextpos targetpos lop steps)]
+    [else (move-next-in-north-east-ne dir nextpos targetpos lop steps)]))
+
+; move-next-in-south-east
+(define (move-next-in-south-east-ne dir startpos targetpos lop steps)
+  (if (or
+        (threat? (next-move-in-south-east startpos) lop)
+        (deadlock-in-south-east? (next-move-in-south-east startpos) lop))
+      (change-direction move-next-in-south-west-ne dir "sw" startpos targetpos lop steps)
+      (move-in-south-east-ne dir (next-move-in-south-east startpos) targetpos lop (+ steps 1))))
+
+;; move-in-south-east-ne : String Position Position LisOfPosition Integer ->
+;; GIVEN:
+;; RETURNS:
+;; STRATEGY:
+(define (move-in-south-east-ne dir nextpos targetpos lop steps)
+  (cond
+    [(target-found? nextpos targetpos) (list dir steps)]
+    [(target-link-found? nextpos targetpos)
+     (move-next-in-south-east-ne dir nextpos targetpos lop steps)]
+    [(target-link-found-in-different-direction? nextpos targetpos)
+     (possible-next-direction-ne dir nextpos targetpos lop steps)]
+    [else (if (or (threat? (next-move-in-north-east nextpos) lop)
+          (deadlock-in-north-east? (next-move-in-north-east nextpos) lop))
+      (move-next-in-south-east-ne dir nextpos targetpos lop steps)
+      (change-direction move-next-in-north-east-ne dir "ne" nextpos targetpos lop steps))]))
+
+;; move-next-in-south-west-ne
+(define (move-next-in-south-west-ne dir nextpos targetpos lop steps)
+  (if (or
+        (threat? (next-move-in-south-west nextpos) lop)
+        (deadlock-in-south-west? (next-move-in-south-west nextpos) lop)) ;; chek dir
+      (change-direction move-next-in-north-west-ne dir "nw" nextpos targetpos lop steps)
+      (move-in-south-west-ne dir (next-move-in-south-west nextpos) targetpos lop (+ steps 1))))
+
+;; move-in-south-west-ne
+(define (move-in-south-west-ne dir nextpos targetpos lop steps)
+  (cond
+    [(target-found? nextpos targetpos) (list dir steps)]
+    [(target-link-found? nextpos targetpos)
+     (check-next-direction dir nextpos targetpos lop steps)]
+    [(and
+      (< (first targetpos) (first (next-move-in-south-west nextpos)))
+      (< (first (rest targetpos)) (first (rest (next-move-in-south-west nextpos)))))
+     (move-next-in-south-west-ne dir nextpos targetpos lop steps)]
+    [else (if (or
+               (threat? (next-move-in-south-east nextpos) lop)
+               (deadlock-in-south-east? (next-move-in-south-east nextpos) lop))
+          (move-next-in-south-west-ne dir nextpos targetpos lop steps)
+          (change-direction move-next-in-south-east-ne dir "se" nextpos targetpos lop steps))]))
+
+;; move-next-in-north-west-ne
+(define (move-next-in-north-west-ne dir startpos targetpos lop steps)
+  (cond
+    [(and
+      (or
+        (threat? (next-move-in-north-west startpos) lop)
+        (deadlock-in-north-west? (next-move-in-north-west startpos) lop))
+      (or
+        (threat? (next-move-in-north-east startpos) lop)
+        (deadlock-in-north-east? (next-move-in-north-east startpos) lop)))
+      false]
+    [else
+  (if (or
+        (threat? (next-move-in-north-west startpos) lop)
+        (deadlock-in-north-west? (next-move-in-north-west startpos) lop))
+      (change-direction move-next-in-north-east-ne dir "ne" startpos targetpos lop steps)
+      (move-in-north-west-ne dir (next-move-in-north-west startpos) targetpos lop (+ steps 1)))]))
+
+;; move-in-north-west-ne
+(define (move-in-north-west-ne dir nextpos targetpos lop steps)
+  (cond
+    [(target-found? nextpos targetpos) (list dir steps)]
+    [(target-link-found? nextpos targetpos)
+     (move-next-in-north-west-ne dir nextpos targetpos lop steps)]
+     [(target-link-found-in-different-direction? nextpos targetpos)
+     (possible-next-direction-ne dir nextpos targetpos lop steps)]
+    [else (if (or (threat? (next-move-in-north-east nextpos) lop)
+          (deadlock-in-north-east? (next-move-in-north-east nextpos) lop))
+      (move-next-in-north-west-ne dir nextpos targetpos lop steps)
+      (change-direction move-next-in-north-east-ne dir "ne" nextpos targetpos lop steps))]))
+
+(define (possible-next-direction-ne dir nextpos targetpos lop steps)
+  (cond
+    [(and (> (first targetpos) (first nextpos))
+          (> (first (rest targetpos)) (first (rest nextpos))))
+     (change-direction move-next-in-north-east-ne dir "ne" nextpos targetpos lop steps)]
+     [(and (< (first targetpos) (first nextpos))
+          (< (first (rest targetpos)) (first (rest nextpos))))
+      (change-direction move-next-in-south-west-ne dir "sw" nextpos targetpos lop steps)]))
+    
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; eval-plan                                                                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;eval-plan : Position ListOfPosition Plan ->  MaybePosition
+;;GIVEN:
+;;1. the starting position of the robot,
+;;2. A list of the blocks on the board
+;;3. A plan for the robot's motion
+;;RETURNS:
+;;The position of the robot at the end of executing the plan, or false
+;;if  the plan sends the robot to or  through any block.
+(define (eval-plan startpos lop plan)
+  (cond
+    [(empty? plan) startpos]
+    [else
+     (eval-plan1 startpos lop (first plan) (rest plan))]))
+
+;; TEST:
+(define blocks (list (list 0 5) (list -3 5)))
+(define plan (list (list "sw" 2) (list "se" 2) (list "nw" 1) (list "ne" 1)))
+(begin-for-test
+  (check-equal?
+   (eval-plan (list -1 6) blocks plan)
+   (list -1 4))
+  (check-equal?
+   (eval-plan (list 2 3) (list (list 3 4)) (list (list "ne" 2)))
+   false))
+
+(define (eval-plan1 startpos lop move plan)
+  (cond
+    [(string=? (first move) "sw") (calculate-sw startpos lop (first (rest move)) plan)]
+    [(string=? (first move) "nw") (calculate-nw startpos lop (first (rest move)) plan)]
+    [(string=? (first move) "se") (calculate-se startpos lop (first (rest move)) plan)]
+    [(string=? (first move) "ne") (calculate-ne startpos lop (first (rest move)) plan)]))
+
+(define (calculate-sw startpos lop count plan)
+  (if(not (= count 0))
+     (change-position (list (- (first startpos) 1)
+                            (- (first (rest startpos)) 1))
+                      lop
+                      count
+                      plan
+                      calculate-sw)
+     (eval-plan startpos lop plan)))
+
+(define (calculate-nw startpos lop count plan)
+  (if(not (= count 0))
+     (change-position (list (- (first startpos) 1)
+                            (+ (first (rest startpos)) 1))
+                      lop
+                      count
+                      plan
+                      calculate-nw)
+     (eval-plan startpos lop plan)))
+
+(define (calculate-se startpos lop count plan)
+  (if(not (= count 0))
+     (change-position (list (+ (first startpos) 1)
+                            (- (first (rest startpos)) 1))
+                      lop
+                      count
+                      plan
+                      calculate-se)
+     (eval-plan startpos lop plan)))
+
+(define (calculate-ne startpos lop count plan)
+  (if(not (= count 0))
+     (change-position (list (+ (first startpos) 1)
+                            (+ (first (rest startpos)) 1))
+                      lop
+                      count
+                      plan
+                      calculate-ne)
+     (eval-plan startpos lop plan)))
+
+(define (change-position nextpos lop count plan func)
+  (if (check-threat nextpos lop)
+      false
+      (func nextpos lop (- count 1) plan)))
+
+(define (check-threat nextpos lop)
+  (ormap
+   (lambda (block) (and
+                    (= (first nextpos) (first block))
+                    (= (first (rest nextpos)) (first (rest block)))))
+   lop))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+     

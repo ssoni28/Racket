@@ -1,0 +1,13 @@
+TA Name:- Shailesh
+Helper Name:- Ameya
+
+Design Grade:- A
+Presentation Grade:- A
+Correctness Score:- 15/15
+
+Notes:-
+
+1. target-x, target-y should return Integer instead of PosInt in PlaygroundState interface
+2. Incorrect datatype PosInt for vel
+3. Could avoid string literals for colors and shape type (use constants) [place-image ...]
+4. Same for key-events and mouse-events

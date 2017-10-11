@@ -1,0 +1,11 @@
+TA Name:- Prachi 
+Helper Name:- Prashanth Rajendran
+
+Design Grade:- A
+Presentation Grade:- A
+Correctness Score:- 15
+
+Notes:-
+
+1. ListOfPosInt should be non-empty list (it’s  section number)
+2. Could have used foldr in legal-flat-rep (?)
